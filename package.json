@@ -1,15 +1,53 @@
 {
   "name": "p-stream-desktop",
+  "productName": "P-Stream",
   "version": "1.0.0",
   "description": "Desktop app for pstream.mov",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux",
+    "dist": "electron-builder --publish=never"
   },
   "devDependencies": {
-    "electron": "^39.3.0"
+    "electron": "^39.3.0",
+    "electron-builder": "^26.0.0"
   },
   "dependencies": {
     "discord-rpc": "^4.0.1"
+  },
+  "build": {
+    "appId": "com.p-stream.desktop",
+    "productName": "P-Stream",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!extension/**",
+      "!dist/**",
+      "!build/**",
+      "!*.md",
+      "!test.js"
+    ],
+    "mac": {
+      "category": "public.app-category.entertainment",
+      "icon": "logo.png"
+    },
+    "win": {
+      "icon": "logo.png",
+      "target": "nsis"
+    },
+    "linux": {
+      "icon": "logo.png",
+      "target": "AppImage"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   }
 }

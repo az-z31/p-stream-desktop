@@ -86,6 +86,9 @@ function createWindow() {
 // });
 
 app.whenReady().then(async () => {
+  // Set the app name
+  app.setName('P-Stream');
+
   // Register IPC handlers
   Object.entries(handlers).forEach(([channel, handler]) => {
     ipcMain.handle(channel, async (event, ...args) => {
