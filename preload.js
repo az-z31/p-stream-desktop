@@ -5,36 +5,42 @@ const VALID_CHANNELS = ['hello', 'makeRequest', 'prepareStream', 'openPage'];
 window.addEventListener('message', async (event) => {
   // Security check: only accept messages from the same window
   if (event.source !== window) return;
-  
+
   const data = event.data;
-  
+
   // Basic Plasmo relay check
   // We look for messages that have a 'name' that matches our API
   // and are NOT marked as 'relayed' (to avoid infinite loops)
   if (!data || !data.name || data.relayed) return;
-  
+
   if (VALID_CHANNELS.includes(data.name)) {
     try {
       // Forward to Main Process
       const response = await ipcRenderer.invoke(data.name, data.body);
-      
+
       // Send response back to window
-      window.postMessage({
-        name: data.name,
-        relayId: data.relayId,
-        instanceId: data.instanceId,
-        body: response,
-        relayed: true
-      }, '*'); // Target origin * is okay here as we validated source === window
+      window.postMessage(
+        {
+          name: data.name,
+          relayId: data.relayId,
+          instanceId: data.instanceId,
+          body: response,
+          relayed: true,
+        },
+        '*',
+      ); // Target origin * is okay here as we validated source === window
     } catch (error) {
       console.error(`[Preload] Error handling ${data.name}:`, error);
-      window.postMessage({
-        name: data.name,
-        relayId: data.relayId,
-        instanceId: data.instanceId,
-        body: { success: false, error: error.message },
-        relayed: true
-      }, '*');
+      window.postMessage(
+        {
+          name: data.name,
+          relayId: data.relayId,
+          instanceId: data.instanceId,
+          body: { success: false, error: error.message },
+          relayed: true,
+        },
+        '*',
+      );
     }
   }
 });
@@ -52,8 +58,7 @@ const getThemeColor = () => {
   const bodyColor = body ? getComputedStyle(body).backgroundColor : '';
   const rootColor = root ? getComputedStyle(root).backgroundColor : '';
 
-  const isTransparent = (value) =>
-    !value || value === 'transparent' || value === 'rgba(0, 0, 0, 0)';
+  const isTransparent = (value) => !value || value === 'transparent' || value === 'rgba(0, 0, 0, 0)';
 
   if (!isTransparent(bodyColor)) return bodyColor;
   if (!isTransparent(rootColor)) return rootColor;

@@ -14,12 +14,22 @@
     "build:win": "electron-builder --win",
     "build:mac": "electron-builder --mac",
     "build:linux": "electron-builder --linux",
-    "dist": "electron-builder --publish=never"
+    "dist": "electron-builder --publish=never",
+    "lint": "eslint .",
+    "lint:fix": "eslint --fix .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.2",
     "cross-env": "^7.0.3",
     "electron": "^39.3.0",
-    "electron-builder": "^26.0.0"
+    "electron-builder": "^26.0.0",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.5",
+    "globals": "^17.1.0",
+    "prettier": "^3.8.1"
   },
   "dependencies": {
     "discord-rpc": "^4.0.1",

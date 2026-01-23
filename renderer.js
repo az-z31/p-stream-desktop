@@ -10,10 +10,10 @@ const appIcon = document.querySelector('.app-icon');
 window.windowControls.onPlatformChanged((platform) => {
   const isMac = platform === 'darwin';
   const isLinux = platform === 'linux';
-  
+
   // Add platform class to body for CSS targeting
   document.body.setAttribute('data-platform', platform);
-  
+
   if (isMac) {
     // macOS: Hide custom buttons, window title, and logo
     if (titlebarRight) titlebarRight.style.display = 'none';
@@ -28,14 +28,17 @@ window.windowControls.onPlatformChanged((platform) => {
     const maximizeIcon = maximizeBtn?.querySelector('.icon-max');
     const restoreIcon = maximizeBtn?.querySelector('.icon-restore');
     if (minimizeIcon) {
-      minimizeIcon.innerHTML = '<path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />';
+      minimizeIcon.innerHTML =
+        '<path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />';
     }
     if (maximizeIcon) {
-      maximizeIcon.innerHTML = '<path d="M3 7.5l3-3 3 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />';
+      maximizeIcon.innerHTML =
+        '<path d="M3 7.5l3-3 3 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />';
     }
     if (restoreIcon) {
       // Restore icon also uses chevron up (same as maximize when not maximized)
-      restoreIcon.innerHTML = '<path d="M3 7.5l3-3 3 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />';
+      restoreIcon.innerHTML =
+        '<path d="M3 7.5l3-3 3 3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />';
     }
   } else {
     // Windows: Keep default Windows-style icons

@@ -22,7 +22,7 @@ let currentActivityTitle = null;
 
 async function setActivity(title) {
   if (!rpc) return;
-  
+
   // Check if Discord RPC is enabled (store might not be initialized yet)
   if (store && !store.get('discordRPCEnabled', true)) {
     // Clear activity if disabled
@@ -38,17 +38,18 @@ async function setActivity(title) {
     state = 'P-Stream is goated af';
   }
 
-  rpc.setActivity({
-    details: details,
-    state: state,
-    startTimestamp,
-    largeImageKey: 'logo',
-    largeImageText: 'P-Stream',
-    instance: false,
-    buttons: [{ label: 'Use P-Stream', url: 'https://pstream.mov/' }]
-  }).catch(console.error);
+  rpc
+    .setActivity({
+      details: details,
+      state: state,
+      startTimestamp,
+      largeImageKey: 'logo',
+      largeImageText: 'P-Stream',
+      instance: false,
+      buttons: [{ label: 'Use P-Stream', url: 'https://pstream.mov/' }],
+    })
+    .catch(console.error);
 }
-
 
 function createWindow() {
   const TITLE_BAR_HEIGHT = 40;
@@ -67,9 +68,9 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload-titlebar.js')
+      preload: path.join(__dirname, 'preload-titlebar.js'),
     },
-    title: 'P-Stream'
+    title: 'P-Stream',
   };
 
   if (isMac) {
@@ -101,8 +102,8 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       persistSessionCookies: true,
-      preload: path.join(__dirname, 'preload.js')
-    }
+      preload: path.join(__dirname, 'preload.js'),
+    },
   });
 
   mainWindow.setBrowserView(view);
@@ -167,10 +168,10 @@ function createControlPanelWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'preload-control-panel.js')
+      preload: path.join(__dirname, 'preload-control-panel.js'),
     },
     title: 'P-Stream Control Panel',
-    show: false
+    show: false,
   });
 
   controlPanelWindow.loadFile(path.join(__dirname, 'control-panel.html'));
@@ -195,27 +196,31 @@ autoUpdater.on('checking-for-update', () => {
 
 autoUpdater.on('update-available', (info) => {
   console.log('Update available:', info.version);
-  dialog.showMessageBox(BrowserWindow.getFocusedWindow() || null, {
-    type: 'info',
-    title: 'Update Available',
-    message: `A new version (${info.version}) of P-Stream is available!`,
-    detail: 'Would you like to download and install it now?',
-    buttons: ['Download', 'Later'],
-    defaultId: 0,
-    cancelId: 1
-  }).then(result => {
-    if (result.response === 0) { // Download button
-      autoUpdater.downloadUpdate();
+  dialog
+    .showMessageBox(BrowserWindow.getFocusedWindow() || null, {
+      type: 'info',
+      title: 'Update Available',
+      message: `A new version (${info.version}) of P-Stream is available!`,
+      detail: 'Would you like to download and install it now?',
+      buttons: ['Download', 'Later'],
+      defaultId: 0,
+      cancelId: 1,
+    })
+    .then((result) => {
+      if (result.response === 0) {
+        // Download button
+        autoUpdater.downloadUpdate();
 
-      // Show download progress notification
-      if (Notification.isSupported()) {
-        new Notification({
-          title: 'Downloading Update',
-          body: 'P-Stream update is being downloaded...'
-        }).show();
+        // Show download progress notification
+        if (Notification.isSupported()) {
+          new Notification({
+            title: 'Downloading Update',
+            body: 'P-Stream update is being downloaded...',
+          }).show();
+        }
       }
-    }
-  }).catch(console.error);
+    })
+    .catch(console.error);
 });
 
 autoUpdater.on('update-not-available', (info) => {
@@ -228,23 +233,28 @@ autoUpdater.on('error', (err) => {
   // Only show error dialog for actual failures, not for "already up to date" scenarios
   // Check if it's a network/API error vs. just no update available
   const errorMessage = err.message || err.toString().toLowerCase();
-  const isNetworkError = errorMessage.includes('enotfound') || 
-                         errorMessage.includes('econnrefused') ||
-                         errorMessage.includes('etimedout') ||
-                         errorMessage.includes('network') ||
-                         errorMessage.includes('connection') ||
-                         errorMessage.includes('fetch') ||
-                         errorMessage.includes('timeout');
-  
+  const isNetworkError =
+    errorMessage.includes('enotfound') ||
+    errorMessage.includes('econnrefused') ||
+    errorMessage.includes('etimedout') ||
+    errorMessage.includes('network') ||
+    errorMessage.includes('connection') ||
+    errorMessage.includes('fetch') ||
+    errorMessage.includes('timeout');
+
   // Don't show errors for "no update available" scenarios
-  const isNoUpdateError = errorMessage.includes('no update available') ||
-                          errorMessage.includes('already latest') ||
-                          errorMessage.includes('404') ||
-                          errorMessage.includes('not found');
-  
+  const isNoUpdateError =
+    errorMessage.includes('no update available') ||
+    errorMessage.includes('already latest') ||
+    errorMessage.includes('404') ||
+    errorMessage.includes('not found');
+
   // Only show dialog for actual network/API errors, not for "no update" scenarios
   if (isNetworkError && !isNoUpdateError) {
-    dialog.showErrorBox('Update Check Failed', 'Unable to check for updates. Please check your internet connection and try again later.');
+    dialog.showErrorBox(
+      'Update Check Failed',
+      'Unable to check for updates. Please check your internet connection and try again later.',
+    );
   } else {
     // For "no update available" or minor errors, just log silently
     console.log('Update check completed (no update available):', err.message || err.toString());
@@ -252,27 +262,31 @@ autoUpdater.on('error', (err) => {
 });
 
 autoUpdater.on('download-progress', (progressObj) => {
-  let log_message = "Download speed: " + progressObj.bytesPerSecond;
+  let log_message = 'Download speed: ' + progressObj.bytesPerSecond;
   log_message = log_message + ' - Downloaded ' + progressObj.percent + '%';
-  log_message = log_message + ' (' + progressObj.transferred + "/" + progressObj.total + ')';
+  log_message = log_message + ' (' + progressObj.transferred + '/' + progressObj.total + ')';
   console.log(log_message);
 });
 
 autoUpdater.on('update-downloaded', (info) => {
   console.log('Update downloaded:', info.version);
-  dialog.showMessageBox(BrowserWindow.getFocusedWindow() || null, {
-    type: 'info',
-    title: 'Update Downloaded',
-    message: `P-Stream ${info.version} has been downloaded!`,
-    detail: 'The update will be installed when you restart the application.',
-    buttons: ['Restart Now', 'Later'],
-    defaultId: 0,
-    cancelId: 1
-  }).then(result => {
-    if (result.response === 0) { // Restart Now button
-      autoUpdater.quitAndInstall();
-    }
-  }).catch(console.error);
+  dialog
+    .showMessageBox(BrowserWindow.getFocusedWindow() || null, {
+      type: 'info',
+      title: 'Update Downloaded',
+      message: `P-Stream ${info.version} has been downloaded!`,
+      detail: 'The update will be installed when you restart the application.',
+      buttons: ['Restart Now', 'Later'],
+      defaultId: 0,
+      cancelId: 1,
+    })
+    .then((result) => {
+      if (result.response === 0) {
+        // Restart Now button
+        autoUpdater.quitAndInstall();
+      }
+    })
+    .catch(console.error);
 });
 
 rpc.on('ready', () => {
@@ -290,8 +304,8 @@ app.whenReady().then(async () => {
   // Initialize settings store (after app is ready so app.getPath works)
   store = new SimpleStore({
     defaults: {
-      discordRPCEnabled: true
-    }
+      discordRPCEnabled: true,
+    },
   });
 
   // Register IPC handlers
@@ -322,7 +336,7 @@ app.whenReady().then(async () => {
       const result = await autoUpdater.checkForUpdates();
       return {
         updateAvailable: result.updateInfo ? true : false,
-        version: result.updateInfo?.version || app.getVersion()
+        version: result.updateInfo?.version || app.getVersion(),
       };
     } catch (error) {
       console.error('Manual update check failed:', error);
@@ -376,9 +390,9 @@ ipcMain.handle('get-discord-rpc-enabled', () => {
 
 ipcMain.handle('set-discord-rpc-enabled', async (event, enabled) => {
   if (!store) return false;
-  
+
   store.set('discordRPCEnabled', enabled);
-  
+
   // Update activity immediately
   if (enabled) {
     // Use stored current activity title
@@ -389,7 +403,7 @@ ipcMain.handle('set-discord-rpc-enabled', async (event, enabled) => {
       rpc.clearActivity().catch(console.error);
     }
   }
-  
+
   return true;
 });
 
