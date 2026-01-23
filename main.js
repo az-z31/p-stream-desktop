@@ -86,7 +86,6 @@ function createWindow() {
   mainWindow.on('maximize', () => mainWindow.webContents.send('window-maximized', true));
   mainWindow.on('unmaximize', () => mainWindow.webContents.send('window-maximized', false));
 
-  warmUpBackend();
   view.webContents.loadURL('https://pstream.mov/');
 
   // Update title when page title changes
