@@ -46,7 +46,10 @@
     },
     "win": {
       "icon": "logo.png",
-      "target": "nsis"
+      "target": "nsis",
+      "verifyUpdateCodeSignature": false,
+      "requestedExecutionLevel": "asInvoker",
+      "executableName": "P-Stream"
     },
     "linux": {
       "icon": "logo.png",
@@ -55,7 +58,15 @@
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "P-Stream",
+      "deleteAppDataOnUninstall": false,
+      "artifactName": "${productName} Setup ${version}.${ext}",
+      "runAfterFinish": true,
+      "language": "1033"
     }
   }
 }
