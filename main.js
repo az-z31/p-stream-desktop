@@ -227,6 +227,22 @@ if (app.isPackaged) {
 // Track if we're doing a manual check to avoid duplicate dialogs
 let isManualCheck = false;
 
+// Simple version comparison function (handles semantic versioning)
+function compareVersions(current, latest) {
+  const currentParts = current.split('.').map(Number);
+  const latestParts = latest.split('.').map(Number);
+
+  for (let i = 0; i < Math.max(currentParts.length, latestParts.length); i++) {
+    const currentPart = currentParts[i] || 0;
+    const latestPart = latestParts[i] || 0;
+
+    if (latestPart > currentPart) return 1; // latest is newer
+    if (latestPart < currentPart) return -1; // current is newer
+  }
+
+  return 0; // versions are equal
+}
+
 // Auto-updater event handlers
 autoUpdater.on('checking-for-update', () => {
   console.log('Checking for update...');
@@ -403,17 +419,37 @@ app.whenReady().then(async () => {
         };
       }
 
-      // Check if updateInfo exists
+      // Check if updateInfo exists and compare versions
       if (result.updateInfo) {
-        console.log('Update available:', result.updateInfo.version);
-        // Reset flag after a short delay to allow event handlers to process
-        setTimeout(() => {
+        const currentVersion = app.getVersion();
+        const updateVersion = result.updateInfo.version;
+        const versionComparison = compareVersions(currentVersion, updateVersion);
+
+        console.log(
+          `Version comparison: current=${currentVersion}, latest=${updateVersion}, comparison=${versionComparison}`,
+        );
+
+        // Only return updateAvailable if the update version is actually newer
+        if (versionComparison > 0) {
+          console.log('Update available:', updateVersion);
+          // Reset flag after a short delay to allow event handlers to process
+          setTimeout(() => {
+            isManualCheck = false;
+          }, 500);
+          return {
+            updateAvailable: true,
+            version: updateVersion,
+            currentVersion: currentVersion,
+          };
+        } else {
+          console.log('Already on latest version:', currentVersion);
           isManualCheck = false;
-        }, 500);
-        return {
-          updateAvailable: true,
-          version: result.updateInfo.version,
-        };
+          return {
+            updateAvailable: false,
+            version: currentVersion,
+            message: 'Already up to date',
+          };
+        }
       }
 
       // No update available
@@ -462,6 +498,66 @@ app.whenReady().then(async () => {
       return {
         error: userMessage,
         version: app.getVersion(),
+      };
+    }
+  });
+
+  // IPC handler for downloading updates
+  ipcMain.handle('downloadUpdate', async () => {
+    try {
+      if (!app.isPackaged) {
+        return {
+          success: false,
+          error: 'Update download is not available in development mode',
+        };
+      }
+
+      console.log('Starting update download...');
+      await autoUpdater.downloadUpdate();
+
+      // Show download progress notification
+      if (Notification.isSupported()) {
+        new Notification({
+          title: 'Downloading Update',
+          body: 'P-Stream update is being downloaded...',
+        }).show();
+      }
+
+      return {
+        success: true,
+        message: 'Update download started',
+      };
+    } catch (error) {
+      console.error('Failed to download update:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to download update',
+      };
+    }
+  });
+
+  // IPC handler for installing updates (restart and install)
+  ipcMain.handle('installUpdate', async () => {
+    try {
+      if (!app.isPackaged) {
+        return {
+          success: false,
+          error: 'Update installation is not available in development mode',
+        };
+      }
+
+      console.log('Installing update and restarting...');
+      autoUpdater.quitAndInstall();
+
+      return {
+        success: true,
+        message: 'Installing update...',
+      };
+    } catch (error) {
+      console.error('Failed to install update:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to install update',
       };
     }
   });

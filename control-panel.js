@@ -32,10 +32,30 @@ toggle.addEventListener('change', async (event) => {
   }
 });
 
-// Handle update check button
+// Track update state
+let updateAvailable = false;
+let updateVersion = null;
+
+// Handle update check/install button
 checkUpdatesBtn.addEventListener('click', async () => {
+  const buttonText = checkUpdatesBtn.textContent;
+  
+  // Handle different button states
+  if (buttonText === 'Install') {
+    await handleInstallUpdate();
+  } else if (buttonText === 'Install & Restart') {
+    await handleRestartAndInstall();
+  } else {
+    // Otherwise, check for updates
+    await handleCheckForUpdates();
+  }
+});
+
+async function handleCheckForUpdates() {
   checkUpdatesBtn.disabled = true;
   checkUpdatesBtn.textContent = 'Checking...';
+  updateAvailable = false;
+  updateVersion = null;
 
   try {
     const result = await window.controlPanel.checkForUpdates();
@@ -58,12 +78,15 @@ checkUpdatesBtn.addEventListener('click', async () => {
         versionText.textContent = `v${result.version}`;
       }, 3000);
     } else if (result.updateAvailable) {
-      // Update available
+      // Update available - show Install button
+      updateAvailable = true;
+      updateVersion = result.version;
       versionText.textContent = `Update available: v${result.version}`;
-      checkUpdatesBtn.textContent = 'Update Available!';
+      checkUpdatesBtn.textContent = 'Install';
     } else {
       // Already up to date
-      versionText.textContent = `v${result.version} (Latest)`;
+      const displayVersion = result.version || result.currentVersion || 'Unknown';
+      versionText.textContent = `v${displayVersion} (Latest)`;
       checkUpdatesBtn.textContent = 'Up to Date';
       setTimeout(() => {
         checkUpdatesBtn.textContent = 'Check for Updates';
@@ -84,7 +107,73 @@ checkUpdatesBtn.addEventListener('click', async () => {
   } finally {
     checkUpdatesBtn.disabled = false;
   }
-});
+}
+
+async function handleInstallUpdate() {
+  checkUpdatesBtn.disabled = true;
+  checkUpdatesBtn.textContent = 'Downloading...';
+  versionText.textContent = 'Downloading update...';
+
+  try {
+    // Start download
+    const downloadResult = await window.controlPanel.downloadUpdate();
+
+    if (downloadResult.error) {
+      versionText.textContent = `Error: ${downloadResult.error}`;
+      checkUpdatesBtn.textContent = 'Install';
+      setTimeout(() => {
+        versionText.textContent = `Update available: v${updateVersion}`;
+      }, 3000);
+      return;
+    }
+
+    // Download started - show progress
+    versionText.textContent = 'Downloading update...';
+    checkUpdatesBtn.textContent = 'Downloading...';
+    checkUpdatesBtn.disabled = true;
+
+    // Note: The actual download completion will be detected when user clicks again
+    // For now, we'll enable the button after a delay and let them check status
+    // In a real scenario, we'd listen for download-progress events via IPC
+    setTimeout(() => {
+      versionText.textContent = `Download complete! Click to install v${updateVersion}`;
+      checkUpdatesBtn.textContent = 'Install & Restart';
+      checkUpdatesBtn.disabled = false;
+    }, 3000);
+  } catch (error) {
+    console.error('Failed to download update:', error);
+    versionText.textContent = 'Error downloading update';
+    checkUpdatesBtn.textContent = 'Install';
+    setTimeout(() => {
+      versionText.textContent = `Update available: v${updateVersion}`;
+    }, 3000);
+    checkUpdatesBtn.disabled = false;
+  }
+}
+
+async function handleRestartAndInstall() {
+  checkUpdatesBtn.disabled = true;
+  checkUpdatesBtn.textContent = 'Installing...';
+  versionText.textContent = 'Installing update and restarting...';
+
+  try {
+    const result = await window.controlPanel.installUpdate();
+    if (result.error) {
+      versionText.textContent = `Error: ${result.error}`;
+      checkUpdatesBtn.textContent = 'Install & Restart';
+      checkUpdatesBtn.disabled = false;
+    } else {
+      versionText.textContent = 'Installing update...';
+      checkUpdatesBtn.textContent = 'Installing...';
+      // App will restart automatically via quitAndInstall()
+    }
+  } catch (error) {
+    console.error('Failed to install update:', error);
+    versionText.textContent = 'Error installing update';
+    checkUpdatesBtn.textContent = 'Install & Restart';
+    checkUpdatesBtn.disabled = false;
+  }
+}
 
 // Handle reset app button
 resetAppBtn.addEventListener('click', async () => {

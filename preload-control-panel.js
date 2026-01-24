@@ -5,5 +5,7 @@ contextBridge.exposeInMainWorld('controlPanel', {
   setDiscordRPCEnabled: (enabled) => ipcRenderer.invoke('set-discord-rpc-enabled', enabled),
   getVersion: () => ipcRenderer.invoke('get-app-version'),
   checkForUpdates: () => ipcRenderer.invoke('checkForUpdates'),
+  downloadUpdate: () => ipcRenderer.invoke('downloadUpdate'),
+  installUpdate: () => ipcRenderer.invoke('installUpdate'),
   resetApp: () => ipcRenderer.invoke('reset-app'),
 });
