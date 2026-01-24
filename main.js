@@ -90,13 +90,6 @@ function createWindow() {
   // Remove the menu entirely
   mainWindow.setMenu(null);
 
-  mainWindow.webContents.on('before-input-event', (event, input) => {
-    if (input.control && input.shift && input.key.toLowerCase() === 'i' && input.type === 'keyDown') {
-      mainWindow.webContents.toggleDevTools();
-      event.preventDefault();
-    }
-  });
-
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
 
   const view = new BrowserView({
@@ -112,6 +105,25 @@ function createWindow() {
   mainBrowserView = view;
 
   mainWindow.setBrowserView(view);
+
+  // Set up keyboard shortcuts after view is created
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    const isMac = platform === 'darwin';
+    const isReload =
+      (isMac && input.meta && input.key.toLowerCase() === 'r') ||
+      (!isMac && input.control && input.key.toLowerCase() === 'r');
+
+    if (isReload && input.type === 'keyDown') {
+      // Reload the BrowserView (embedded web page)
+      if (view && view.webContents) {
+        view.webContents.reload();
+      }
+      event.preventDefault();
+    } else if (input.control && input.shift && input.key.toLowerCase() === 'i' && input.type === 'keyDown') {
+      mainWindow.webContents.toggleDevTools();
+      event.preventDefault();
+    }
+  });
 
   const resizeView = () => {
     const { width, height } = mainWindow.getContentBounds();
