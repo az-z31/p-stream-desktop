@@ -1,4 +1,14 @@
-const { app, BrowserWindow, BrowserView, session, ipcMain, dialog, Notification, globalShortcut } = require('electron');
+const {
+  app,
+  BrowserWindow,
+  BrowserView,
+  session,
+  ipcMain,
+  dialog,
+  Notification,
+  globalShortcut,
+  shell,
+} = require('electron');
 const path = require('path');
 const { handlers, setupInterceptors } = require('./ipc-handlers');
 const DiscordRPC = require('discord-rpc');
@@ -152,6 +162,59 @@ function createWindow() {
   const fullUrl =
     streamUrl.startsWith('http://') || streamUrl.startsWith('https://') ? streamUrl : `https://${streamUrl}/`;
   view.webContents.loadURL(fullUrl);
+
+  // Helper function to extract domain from URL
+  function getDomainFromUrl(url) {
+    try {
+      const urlObj = new URL(url);
+      return urlObj.hostname.replace(/^www\./, ''); // Remove www. prefix for comparison
+    } catch {
+      return null;
+    }
+  }
+
+  // Helper function to check if URL is external
+  function isExternalUrl(url) {
+    try {
+      const currentDomain = getDomainFromUrl(fullUrl);
+      const targetDomain = getDomainFromUrl(url);
+      if (!currentDomain || !targetDomain) return true; // If we can't parse, treat as external
+      return currentDomain !== targetDomain;
+    } catch {
+      return true; // If parsing fails, treat as external
+    }
+  }
+
+  // Handle new window requests (middle-click, Ctrl+Click, target="_blank", etc.)
+  view.webContents.setWindowOpenHandler(({ url }) => {
+    // Check if the URL is external (different domain)
+    if (isExternalUrl(url)) {
+      // Open external links in the default browser
+      shell.openExternal(url).catch((err) => {
+        console.error('Failed to open external URL:', err);
+      });
+      return { action: 'deny' }; // Prevent opening in Electron window
+    } else {
+      // Internal links: navigate in the current view
+      view.webContents.loadURL(url);
+      return { action: 'deny' }; // Prevent opening a new window
+    }
+  });
+
+  // Also handle the deprecated 'new-window' event as a fallback
+  view.webContents.on('new-window', (event, navigationUrl) => {
+    event.preventDefault();
+    // Check if the URL is external (different domain)
+    if (isExternalUrl(navigationUrl)) {
+      // Open external links in the default browser
+      shell.openExternal(navigationUrl).catch((err) => {
+        console.error('Failed to open external URL:', err);
+      });
+    } else {
+      // Internal links: navigate in the current view
+      view.webContents.loadURL(navigationUrl);
+    }
+  });
 
   // Update title when page title changes
   view.webContents.on('page-title-updated', (event, title) => {
