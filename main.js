@@ -1,14 +1,4 @@
-const {
-  app,
-  BrowserWindow,
-  BrowserView,
-  session,
-  ipcMain,
-  dialog,
-  Notification,
-  globalShortcut,
-  shell,
-} = require('electron');
+const { app, BrowserWindow, BrowserView, session, ipcMain, dialog, globalShortcut, shell } = require('electron');
 const path = require('path');
 const { handlers, setupInterceptors } = require('./ipc-handlers');
 const { autoUpdater } = require('electron-updater');
@@ -20,10 +10,6 @@ let store = null;
 
 // Control panel window reference
 let controlPanelWindow = null;
-
-// Track if update is downloaded and ready to install
-let updateDownloaded = false;
-let downloadedUpdateVersion = null;
 
 // BrowserView reference (for reset functionality)
 let mainBrowserView = null;
@@ -372,8 +358,8 @@ function createControlPanelWindow() {
 }
 
 // Auto-updater configuration
-autoUpdater.autoDownload = false; // Don't auto-download, let user choose
-autoUpdater.autoInstallOnAppQuit = true; // Auto-install when app quits
+autoUpdater.autoDownload = false; // Don't auto-download, users download manually
+autoUpdater.autoInstallOnAppQuit = false; // Don't auto-install, users install manually
 
 // Configure updater for GitHub releases
 // electron-updater automatically reads from package.json build.publish config
@@ -397,58 +383,6 @@ if (app.isPackaged) {
 let isManualCheck = false;
 // Track if we're checking on startup (to handle pending updates)
 let isStartupCheck = false;
-
-// Helper function to install update and restart
-// This properly closes all windows and handles the installation
-function installAndRestart() {
-  if (!updateDownloaded) {
-    console.error('Cannot install: update not downloaded');
-    dialog.showErrorBox('Installation Error', 'Update is not downloaded yet. Please wait for download to complete.');
-    return;
-  }
-
-  console.log('Installing update and restarting...');
-  console.log('Update version:', downloadedUpdateVersion);
-
-  try {
-    // Close all windows first to ensure clean quit
-    const windows = BrowserWindow.getAllWindows();
-    console.log(`Closing ${windows.length} window(s) before installation...`);
-
-    windows.forEach((win) => {
-      // Remove close listeners that might prevent quitting
-      win.removeAllListeners('close');
-      win.destroy();
-    });
-
-    // Use setImmediate to ensure all windows are closed and dialogs are released
-    // This is especially important on macOS
-    setImmediate(() => {
-      try {
-        // Remove window-all-closed listener that might prevent quitting
-        app.removeAllListeners('window-all-closed');
-
-        console.log('Calling quitAndInstall...');
-        // false = isSilent (show installer UI), true = isForceRunAfter (restart app)
-        autoUpdater.quitAndInstall(false, true);
-      } catch (error) {
-        console.error('Error in quitAndInstall:', error);
-        // Fallback: try without force run after
-        try {
-          console.log('Trying fallback installation method...');
-          autoUpdater.quitAndInstall(false, false);
-        } catch (err2) {
-          console.error('Fallback installation also failed:', err2);
-          // Last resort: just quit and let autoInstallOnAppQuit handle it
-          app.quit();
-        }
-      }
-    });
-  } catch (error) {
-    console.error('Error preparing for installation:', error);
-    dialog.showErrorBox('Installation Error', `Failed to prepare for installation: ${error.message}`);
-  }
-}
 
 // Simple version comparison function (handles semantic versioning)
 function compareVersions(current, latest) {
@@ -474,34 +408,32 @@ autoUpdater.on('checking-for-update', () => {
 autoUpdater.on('update-available', (info) => {
   console.log('Update available:', info.version);
 
-  // Only show dialog for automatic checks, not manual checks from control panel
-  // Manual checks will show status in the control panel instead
+  // Show dialog for automatic checks (startup) or when not a manual check from control panel
+  // Manual checks from control panel will show status in the control panel instead
   if (!isManualCheck) {
-    dialog
-      .showMessageBox(BrowserWindow.getFocusedWindow() || null, {
-        type: 'info',
-        title: 'Update Available',
-        message: `A new version (${info.version}) of P-Stream is available!`,
-        detail: 'Would you like to download and install it now?',
-        buttons: ['Download', 'Later'],
-        defaultId: 0,
-        cancelId: 1,
-      })
-      .then((result) => {
-        if (result.response === 0) {
-          // Download button
-          autoUpdater.downloadUpdate();
-
-          // Show download progress notification
-          if (Notification.isSupported()) {
-            new Notification({
-              title: 'Downloading Update',
-              body: 'P-Stream update is being downloaded...',
-            }).show();
-          }
-        }
-      })
-      .catch(console.error);
+    // Wait a bit for the window to be ready, especially on startup
+    setTimeout(
+      () => {
+        dialog
+          .showMessageBox(BrowserWindow.getFocusedWindow() || null, {
+            type: 'info',
+            title: 'Update Available',
+            message: `A new version (${info.version}) of P-Stream is available!`,
+            detail: 'Would you like to open the releases page to download the update?',
+            buttons: ['Open Releases Page', 'Later'],
+            defaultId: 0,
+            cancelId: 1,
+          })
+          .then((result) => {
+            if (result.response === 0) {
+              // Open Releases Page button
+              shell.openExternal('https://github.com/p-stream/p-stream-desktop/releases');
+            }
+          })
+          .catch(console.error);
+      },
+      isStartupCheck ? 2000 : 0,
+    ); // Wait 2 seconds on startup to ensure window is ready
   }
 });
 
@@ -552,72 +484,8 @@ autoUpdater.on('download-progress', (progressObj) => {
 
 autoUpdater.on('update-downloaded', (info) => {
   console.log('Update downloaded:', info.version);
-  updateDownloaded = true;
-  downloadedUpdateVersion = info.version;
-
-  // Notify control panel if it's open
-  if (controlPanelWindow && !controlPanelWindow.isDestroyed()) {
-    controlPanelWindow.webContents.send('update-downloaded', {
-      version: info.version,
-    });
-  }
-
-  // On startup, if there's a pending update, prompt to install it immediately
-  if (isStartupCheck) {
-    console.log('Pending update found on startup:', info.version);
-    isStartupCheck = false;
-    // Wait a bit for the window to be ready, then show the dialog
-    setTimeout(() => {
-      dialog
-        .showMessageBox(BrowserWindow.getFocusedWindow() || null, {
-          type: 'info',
-          title: 'Update Ready to Install',
-          message: `P-Stream ${info.version} has been downloaded and is ready to install!`,
-          detail: 'Would you like to install it now? The application will restart.',
-          buttons: ['Install Now', 'Later'],
-          defaultId: 0,
-          cancelId: 1,
-        })
-        .then((result) => {
-          if (result.response === 0) {
-            // Install Now button - install and restart
-            console.log('User chose to install update on startup');
-            installAndRestart();
-          } else {
-            // User chose Later - update will be available in control panel
-            console.log('User chose to install update later');
-          }
-        })
-        .catch((error) => {
-          console.error('Error showing update dialog on startup:', error);
-        });
-    }, 2000);
-    return;
-  }
-
-  // Only show dialog for automatic checks (not manual checks from control panel)
-  if (!isManualCheck) {
-    dialog
-      .showMessageBox(BrowserWindow.getFocusedWindow() || null, {
-        type: 'info',
-        title: 'Update Downloaded',
-        message: `P-Stream ${info.version} has been downloaded!`,
-        detail: 'The update will be installed when you restart the application.',
-        buttons: ['Restart Now', 'Later'],
-        defaultId: 0,
-        cancelId: 1,
-      })
-      .then((result) => {
-        if (result.response === 0) {
-          // Restart Now button - close all windows and install
-          console.log('User chose to install update from dialog');
-          installAndRestart();
-        }
-      })
-      .catch((error) => {
-        console.error('Error in update dialog:', error);
-      });
-  }
+  // Note: We no longer handle installation automatically
+  // Users will download manually from GitHub releases
 });
 
 app.whenReady().then(async () => {
@@ -784,48 +652,6 @@ app.whenReady().then(async () => {
     }
   });
 
-  // IPC handler for downloading updates
-  ipcMain.handle('downloadUpdate', async () => {
-    try {
-      if (!app.isPackaged) {
-        return {
-          success: false,
-          error: 'Update download is not available in development mode',
-        };
-      }
-
-      console.log('Starting update download...');
-      await autoUpdater.downloadUpdate();
-
-      // Show download progress notification
-      if (Notification.isSupported()) {
-        new Notification({
-          title: 'Downloading Update',
-          body: 'P-Stream update is being downloaded...',
-        }).show();
-      }
-
-      return {
-        success: true,
-        message: 'Update download started',
-      };
-    } catch (error) {
-      console.error('Failed to download update:', error);
-      return {
-        success: false,
-        error: error.message || 'Failed to download update',
-      };
-    }
-  });
-
-  // IPC handler for checking if update is downloaded
-  ipcMain.handle('isUpdateDownloaded', () => {
-    return {
-      downloaded: updateDownloaded,
-      version: downloadedUpdateVersion,
-    };
-  });
-
   // IPC handler for restarting the app (useful in development mode)
   ipcMain.handle('restartApp', () => {
     try {
@@ -839,39 +665,14 @@ app.whenReady().then(async () => {
     }
   });
 
-  // IPC handler for installing updates (restart and install)
-  ipcMain.handle('installUpdate', async () => {
+  // IPC handler for opening releases page in external browser
+  ipcMain.handle('openReleasesPage', () => {
     try {
-      if (!app.isPackaged) {
-        return {
-          success: false,
-          error: 'Update installation is not available in development mode',
-        };
-      }
-
-      if (!updateDownloaded) {
-        return {
-          success: false,
-          error: 'Update is not downloaded yet. Please wait for download to complete.',
-        };
-      }
-
-      console.log('Installing update via IPC handler...');
-      // Use the helper function to ensure proper installation
-      installAndRestart();
-
-      // This return may not execute since quitAndInstall quits the app immediately
-      // But we return it anyway for the IPC call
-      return {
-        success: true,
-        message: 'Installing update and restarting...',
-      };
+      shell.openExternal('https://github.com/p-stream/p-stream-desktop/releases');
+      return { success: true };
     } catch (error) {
-      console.error('Failed to install update:', error);
-      return {
-        success: false,
-        error: error.message || 'Failed to install update',
-      };
+      console.error('Failed to open releases page:', error);
+      return { success: false, error: error.message };
     }
   });
 

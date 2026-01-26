@@ -29,16 +29,21 @@ async function loadState() {
     console.error('Failed to load stream URL:', error);
   }
 
-  // Check if we're in development mode and show restart button instead
+  // Check if we're in development mode and show releases page button
   try {
     const updateCheck = await window.controlPanel.checkForUpdates();
     if (updateCheck.isDevelopment) {
-      checkUpdatesBtn.textContent = 'Restart App';
+      checkUpdatesBtn.textContent = 'Open Releases Page';
       versionText.textContent = `v${updateCheck.version} (Dev Mode)`;
+    } else {
+      // In production, start with "Check for Updates" button
+      checkUpdatesBtn.textContent = 'Check for Updates';
     }
   } catch (error) {
     // Ignore errors when checking for dev mode
     console.log('Could not determine if in dev mode:', error);
+    // Default to "Check for Updates" if we can't determine mode
+    checkUpdatesBtn.textContent = 'Check for Updates';
   }
 }
 
@@ -53,31 +58,13 @@ toggle.addEventListener('change', async (event) => {
   }
 });
 
-// Track update state
-let updateAvailable = false;
-let updateVersion = null;
-let updateDownloaded = false;
-
-// Listen for update download completion
-window.controlPanel.onUpdateDownloaded((data) => {
-  console.log('Update downloaded event received:', data);
-  updateDownloaded = true;
-  versionText.textContent = `Download complete! Click to install v${data.version}`;
-  checkUpdatesBtn.textContent = 'Install & Restart';
-  checkUpdatesBtn.disabled = false;
-});
-
-// Handle update check/install button
+// Handle update check button
 checkUpdatesBtn.addEventListener('click', async () => {
   const buttonText = checkUpdatesBtn.textContent;
 
   // Handle different button states
-  if (buttonText === 'Restart App') {
-    await handleRestartApp();
-  } else if (buttonText === 'Install') {
-    await handleInstallUpdate();
-  } else if (buttonText === 'Install & Restart') {
-    await handleRestartAndInstall();
+  if (buttonText === 'Open Releases Page') {
+    await handleOpenReleasesPage();
   } else {
     // Otherwise, check for updates
     await handleCheckForUpdates();
@@ -87,8 +74,6 @@ checkUpdatesBtn.addEventListener('click', async () => {
 async function handleCheckForUpdates() {
   checkUpdatesBtn.disabled = true;
   checkUpdatesBtn.textContent = 'Checking...';
-  updateAvailable = false;
-  updateVersion = null;
 
   try {
     const result = await window.controlPanel.checkForUpdates();
@@ -104,15 +89,13 @@ async function handleCheckForUpdates() {
         }
       }, 5000);
     } else if (result.isDevelopment) {
-      // Development mode - show restart button instead
+      // Development mode - show releases page button
       versionText.textContent = `v${result.version} (Dev Mode)`;
-      checkUpdatesBtn.textContent = 'Restart App';
+      checkUpdatesBtn.textContent = 'Open Releases Page';
     } else if (result.updateAvailable) {
-      // Update available - show Install button
-      updateAvailable = true;
-      updateVersion = result.version;
+      // Update available - show button to open releases page
       versionText.textContent = `Update available: v${result.version}`;
-      checkUpdatesBtn.textContent = 'Install';
+      checkUpdatesBtn.textContent = 'Open Releases Page';
     } else {
       // Already up to date
       const displayVersion = result.version || result.currentVersion || 'Unknown';
@@ -139,107 +122,18 @@ async function handleCheckForUpdates() {
   }
 }
 
-async function handleInstallUpdate() {
-  // Check if update is already downloaded
-  const downloadStatus = await window.controlPanel.isUpdateDownloaded();
-  if (downloadStatus.downloaded) {
-    updateDownloaded = true;
-    versionText.textContent = `Download complete! Click to install v${downloadStatus.version}`;
-    checkUpdatesBtn.textContent = 'Install & Restart';
-    checkUpdatesBtn.disabled = false;
-    return;
-  }
-
-  checkUpdatesBtn.disabled = true;
-  checkUpdatesBtn.textContent = 'Downloading...';
-  versionText.textContent = 'Downloading update...';
-  updateDownloaded = false;
-
+async function handleOpenReleasesPage() {
   try {
-    // Start download
-    const downloadResult = await window.controlPanel.downloadUpdate();
-
-    if (downloadResult.error) {
-      versionText.textContent = `Error: ${downloadResult.error}`;
-      checkUpdatesBtn.textContent = 'Install';
-      setTimeout(() => {
-        versionText.textContent = `Update available: v${updateVersion}`;
-      }, 3000);
-      checkUpdatesBtn.disabled = false;
-      return;
-    }
-
-    // Download started - show progress
-    // The update-downloaded event will be handled by the listener above
-    versionText.textContent = 'Downloading update...';
-    checkUpdatesBtn.textContent = 'Downloading...';
-    checkUpdatesBtn.disabled = true;
+    await window.controlPanel.openReleasesPage();
+    // Button text can stay as "Open Releases Page" since the page is now open
   } catch (error) {
-    console.error('Failed to download update:', error);
-    versionText.textContent = 'Error downloading update';
-    checkUpdatesBtn.textContent = 'Install';
+    console.error('Failed to open releases page:', error);
+    versionText.textContent = 'Error opening releases page';
     setTimeout(() => {
-      versionText.textContent = `Update available: v${updateVersion}`;
+      window.controlPanel.getVersion().then((version) => {
+        versionText.textContent = `v${version}`;
+      });
     }, 3000);
-    checkUpdatesBtn.disabled = false;
-  }
-}
-
-async function handleRestartApp() {
-  checkUpdatesBtn.disabled = true;
-  checkUpdatesBtn.textContent = 'Restarting...';
-  versionText.textContent = 'Restarting application...';
-
-  try {
-    const result = await window.controlPanel.restartApp();
-    if (result.error) {
-      versionText.textContent = `Error: ${result.error}`;
-      checkUpdatesBtn.textContent = 'Restart App';
-      checkUpdatesBtn.disabled = false;
-    } else {
-      // App will restart, so this won't execute
-      versionText.textContent = 'Restarting...';
-      checkUpdatesBtn.textContent = 'Restarting...';
-    }
-  } catch (error) {
-    console.error('Failed to restart app:', error);
-    versionText.textContent = 'Error restarting app';
-    checkUpdatesBtn.textContent = 'Restart App';
-    checkUpdatesBtn.disabled = false;
-  }
-}
-
-async function handleRestartAndInstall() {
-  // Verify update is downloaded before installing
-  const downloadStatus = await window.controlPanel.isUpdateDownloaded();
-  if (!downloadStatus.downloaded) {
-    versionText.textContent = 'Update not downloaded yet. Please wait...';
-    checkUpdatesBtn.textContent = 'Install & Restart';
-    checkUpdatesBtn.disabled = false;
-    return;
-  }
-
-  checkUpdatesBtn.disabled = true;
-  checkUpdatesBtn.textContent = 'Installing...';
-  versionText.textContent = 'Installing update and restarting...';
-
-  try {
-    const result = await window.controlPanel.installUpdate();
-    if (result.error) {
-      versionText.textContent = `Error: ${result.error}`;
-      checkUpdatesBtn.textContent = 'Install & Restart';
-      checkUpdatesBtn.disabled = false;
-    } else {
-      versionText.textContent = 'Installing update and restarting...';
-      checkUpdatesBtn.textContent = 'Installing...';
-      // quitAndInstall() will restart the app and install the update
-      // The app will close and restart automatically
-    }
-  } catch (error) {
-    console.error('Failed to install update:', error);
-    versionText.textContent = 'Error installing update';
-    checkUpdatesBtn.textContent = 'Install & Restart';
-    checkUpdatesBtn.disabled = false;
   }
 }
 
@@ -288,7 +182,7 @@ saveUrlBtn.addEventListener('click', async () => {
       saveUrlBtn.disabled = false;
       alert('Failed to save URL. Please try again.');
     }
-  } catch (error) {
+  } catch {
     alert('Please enter a valid URL or domain name');
   }
 });
