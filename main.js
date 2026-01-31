@@ -656,8 +656,15 @@ app.whenReady().then(async () => {
     });
   });
 
-  // Setup Network Interceptors
-  setupInterceptors(session.defaultSession);
+  // Setup Network Interceptors (and add X-P-Stream-Client header for the configured stream URL only)
+  setupInterceptors(session.defaultSession, {
+    getStreamHostname: () => {
+      const streamUrl = store.get('streamUrl', 'pstream.mov');
+      const full =
+        streamUrl.startsWith('http://') || streamUrl.startsWith('https://') ? streamUrl : `https://${streamUrl}/`;
+      return new URL(full).hostname.replace(/^www\./, '');
+    },
+  });
 
   createWindow();
 

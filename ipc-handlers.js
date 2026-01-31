@@ -206,11 +206,32 @@ const handlers = {
 
 // --- Network Interceptor ---
 
-function setupInterceptors(sess) {
+/**
+ * @param {Electron.Session} sess
+ * @param {{ getStreamHostname?: () => string | null }} [options] - If getStreamHostname is provided, requests to that hostname get X-P-Stream-Client: desktop
+ */
+function setupInterceptors(sess, options = {}) {
   const filter = { urls: ['<all_urls>'] };
 
   sess.webRequest.onBeforeSendHeaders(filter, (details, callback) => {
     let requestHeaders = details.requestHeaders;
+
+    // Add app identity header for the configured stream URL only (so the site knows it's in the app, not a browser)
+    const getStreamHostname = options.getStreamHostname;
+    if (typeof getStreamHostname === 'function') {
+      try {
+        const streamHostname = getStreamHostname();
+        if (streamHostname) {
+          const requestHostname = new URL(details.url).hostname.replace(/^www\./, '');
+          if (requestHostname === streamHostname.replace(/^www\./, '')) {
+            requestHeaders['X-P-Stream-Client'] = 'desktop';
+          }
+        }
+      } catch (_) {
+        // ignore URL parse errors
+      }
+    }
+
     let modified = false;
 
     // Check all active rules
