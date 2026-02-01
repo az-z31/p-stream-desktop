@@ -6,6 +6,61 @@ DiscordRPC.register(clientId);
 
 const rpc = new DiscordRPC.Client({ transport: 'ipc' });
 
+// Activity type 3 = Watching — only Watching (and Listening) show the timestamp/progress bar in Discord
+const ACTIVITY_TYPE_WATCHING = 3;
+
+/**
+ * Send SET_ACTIVITY with our own payload (including type) via the client's request() method,
+ * so we can set activity type without patching the discord-rpc library.
+ */
+function setActivityRaw(args) {
+  if (!rpc || typeof rpc.request !== 'function') return Promise.resolve();
+
+  let timestamps;
+  if (args.startTimestamp != null || args.endTimestamp != null) {
+    const start =
+      args.startTimestamp != null
+        ? Math.round(args.startTimestamp instanceof Date ? args.startTimestamp.getTime() : args.startTimestamp)
+        : NaN;
+    const end =
+      args.endTimestamp != null
+        ? Math.round(args.endTimestamp instanceof Date ? args.endTimestamp.getTime() : args.endTimestamp)
+        : NaN;
+    timestamps = {};
+    if (Number.isFinite(start)) timestamps.start = start;
+    if (Number.isFinite(end)) timestamps.end = end;
+    if (Object.keys(timestamps).length === 0) timestamps = undefined;
+  }
+
+  const assets =
+    args.largeImageKey || args.largeImageText
+      ? {
+          large_image: args.largeImageKey,
+          large_text: args.largeImageText,
+          small_image: args.smallImageKey,
+          small_text: args.smallImageText,
+        }
+      : undefined;
+
+  const activity = {
+    type: ACTIVITY_TYPE_WATCHING,
+    name: args.name ?? 'P-Stream',
+    state: args.state ?? undefined,
+    details: args.details ?? undefined,
+    timestamps,
+    assets,
+    buttons: args.buttons,
+    instance: !!args.instance,
+  };
+
+  return rpc
+    .request('SET_ACTIVITY', {
+      pid: process.pid,
+      activity,
+    })
+    .catch(console.error);
+}
+
 // Store current media metadata for Discord RPC
 let currentMediaMetadata = null;
 let currentActivityTitle = null;
@@ -17,18 +72,37 @@ function getStreamUrlForRPC() {
   return streamUrl.startsWith('http://') || streamUrl.startsWith('https://') ? streamUrl : `https://${streamUrl}/`;
 }
 
-function createProgressBar(time, duration, options = {}) {
-  const { barLength = 10, barFill = '█', barTrack = '░', showLabel = true } = options;
+/**
+ * Build the activity name (main status name in Discord) from media metadata.
+ * Shows: "The Simpsons S5 E5: Treehouse of Horror IV" (artist + title, where title is like "S5 E5: Episode Name")
+ * Movies/single: just the title
+ */
+function getActivityNameFromMedia(mediaMetadata) {
+  if (!mediaMetadata?.title) return 'P-Stream';
+  const title = mediaMetadata.title;
+  const artist = mediaMetadata.artist;
+  return artist ? `${artist} - ${title}` : title;
+}
 
-  if (!time || !duration || duration === 0) {
-    return '';
+/**
+ * Get start/end timestamps in Unix milliseconds for Discord RPC progress bar.
+ * Discord and the discord-rpc library expect milliseconds. Returns [undefined, undefined] for live/invalid duration.
+ */
+function getTimestampsFromMediaMetadata(mediaMetadata) {
+  if (!mediaMetadata || mediaMetadata.currentTime == null) return [undefined, undefined];
+
+  const currentTimeSec = Number(mediaMetadata.currentTime);
+  const durationSec = Number.isFinite(mediaMetadata.duration) ? Number(mediaMetadata.duration) : NaN;
+
+  if (!Number.isFinite(durationSec) || durationSec <= 0) {
+    return [undefined, undefined];
   }
 
-  const progress = Math.floor((time / duration) * 100);
-  const numChars = Math.floor((progress / 100) * barLength);
+  const nowMs = Date.now();
+  const startMs = Math.round(nowMs - currentTimeSec * 1000);
+  const endMs = Math.round(startMs + durationSec * 1000);
 
-  const bar = `${barFill.repeat(numChars)}${barTrack.repeat(barLength - numChars)}`;
-  return showLabel ? `${bar}  ${progress}%` : bar;
+  return [startMs, endMs];
 }
 
 async function setActivity(title, mediaMetadata = null) {
@@ -40,24 +114,19 @@ async function setActivity(title, mediaMetadata = null) {
   }
 
   if (!mediaMetadata || !mediaMetadata.title) {
-    const activity = {
+    setActivityRaw({
       details: title && title !== 'P-Stream' ? `Watching: ${title}` : 'P-Stream',
       startTimestamp: new Date(),
       largeImageKey: 'logo',
       largeImageText: 'P-Stream',
       instance: false,
       buttons: [{ label: 'Use P-Stream', url: getStreamUrlForRPC() }],
-    };
-    rpc.setActivity(activity).catch(console.error);
+    });
     return;
   }
 
-  // Only show progress bar if there's valid progress data
-  const hasProgress = mediaMetadata.currentTime != null && mediaMetadata.duration != null && mediaMetadata.duration > 0;
-
-  const state = hasProgress ? createProgressBar(mediaMetadata.currentTime, mediaMetadata.duration) : null;
-
   const activity = {
+    name: getActivityNameFromMedia(mediaMetadata),
     details: 'Watching: ' + (mediaMetadata.artist ? mediaMetadata.artist + ' ' : '') + mediaMetadata.title,
     startTimestamp: new Date(),
     largeImageKey: mediaMetadata.poster || 'logo',
@@ -66,19 +135,15 @@ async function setActivity(title, mediaMetadata = null) {
     buttons: [{ label: 'Use P-Stream', url: getStreamUrlForRPC() }],
   };
 
-  if (state) {
-    activity.state = state;
+  const [startTimestamp, endTimestamp] = getTimestampsFromMediaMetadata(mediaMetadata);
+  if (startTimestamp != null) {
+    activity.startTimestamp = startTimestamp;
+  }
+  if (endTimestamp != null) {
+    activity.endTimestamp = endTimestamp;
   }
 
-  if (mediaMetadata.currentTime != null && mediaMetadata.duration != null) {
-    const now = Date.now();
-    const elapsed = mediaMetadata.currentTime * 1000;
-    const remaining = (mediaMetadata.duration - mediaMetadata.currentTime) * 1000;
-    activity.startTimestamp = new Date(now - elapsed);
-    activity.endTimestamp = new Date(now + remaining);
-  }
-
-  rpc.setActivity(activity).catch(console.error);
+  setActivityRaw(activity);
 }
 
 function initialize(settingsStore) {
