@@ -56,7 +56,7 @@
     ],
     "mac": {
       "category": "public.app-category.entertainment",
-      "icon": "P-Stream.icon",
+      "icon": "logo.png",
       "target": [
         "dmg",
         "zip"
@@ -64,7 +64,7 @@
       "strictVerify": false
     },
     "win": {
-      "icon": "P-Stream.png",
+      "icon": "logo.png",
       "target": [
         "nsis",
         "zip"
@@ -73,7 +73,7 @@
       "executableName": "P-Stream"
     },
     "linux": {
-      "icon": "P-Stream.png",
+      "icon": "logo.png",
       "target": "AppImage",
       "category": "AudioVideo"
     },

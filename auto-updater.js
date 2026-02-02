@@ -207,7 +207,7 @@ function createUpdaterWindow() {
     alwaysOnTop: true,
     skipTaskbar: false,
     backgroundColor: '#1f2025',
-    icon: process.platform === 'darwin' ? path.join(__dirname, 'P-Stream.icon') : path.join(__dirname, 'P-Stream.png'),
+    icon: path.join(__dirname, 'logo.png'),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

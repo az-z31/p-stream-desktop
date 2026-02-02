@@ -21,13 +21,12 @@ function createWindow() {
   const platform = process.env.PLATFORM_OVERRIDE || process.platform;
   const isMac = platform === 'darwin';
 
-  // Configure window based on platform (icons: Mac = .icon, Windows/Linux = PNG for start menu)
-  const windowIcon = isMac ? path.join(__dirname, 'P-Stream.icon') : path.join(__dirname, 'P-Stream.png');
+  // Configure window based on platform
   const windowOptions = {
     width: 1300,
     height: 800,
     autoHideMenuBar: true,
-    icon: windowIcon,
+    icon: path.join(__dirname, 'logo.png'),
     backgroundColor: '#1f2025',
     fullscreenable: true,
     webPreferences: {
@@ -530,16 +529,13 @@ function createControlPanelWindow() {
     return;
   }
 
-  const platform = process.env.PLATFORM_OVERRIDE || process.platform;
-  const controlPanelIcon =
-    platform === 'darwin' ? path.join(__dirname, 'P-Stream.icon') : path.join(__dirname, 'P-Stream.png');
   controlPanelWindow = new BrowserWindow({
     width: 500,
     height: 400,
     minWidth: 400,
     minHeight: 300,
     autoHideMenuBar: true,
-    icon: controlPanelIcon,
+    icon: path.join(__dirname, 'logo.png'),
     backgroundColor: '#1f2025',
     webPreferences: {
       nodeIntegration: false,
