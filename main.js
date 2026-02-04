@@ -187,9 +187,6 @@ function createWindow() {
         view.webContents.reload();
       }
       event.preventDefault();
-    } else if (input.control && input.shift && input.key.toLowerCase() === 'i' && input.type === 'keyDown') {
-      mainWindow.webContents.toggleDevTools();
-      event.preventDefault();
     }
   });
 
@@ -587,14 +584,34 @@ function createWindow() {
     view.webContents.executeJavaScript(script).catch(console.error);
   };
 
+  // Right-click opens DevTools for the embedded page (injected so the page captures the event)
+  const injectDevToolsShortcut = () => {
+    const script = `
+      (function() {
+        if (window.__PSTREAM_DEVTOOLS_SHORTCUT__) return;
+        window.__PSTREAM_DEVTOOLS_SHORTCUT__ = true;
+        document.addEventListener('contextmenu', function(e) {
+          if (window.__PSTREAM_OPEN_DEVTOOLS__) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.__PSTREAM_OPEN_DEVTOOLS__();
+          }
+        }, true);
+      })();
+    `;
+    view.webContents.executeJavaScript(script).catch(() => {});
+  };
+
   // Inject media watcher when page loads
   view.webContents.on('did-finish-load', () => {
     injectMediaWatcher();
+    injectDevToolsShortcut();
   });
 
   // Also inject on navigation
   view.webContents.on('did-navigate', () => {
     setTimeout(injectMediaWatcher, 1000);
+    setTimeout(injectDevToolsShortcut, 100);
   });
 
   // Update title when page title changes
@@ -1205,6 +1222,12 @@ ipcMain.on('window-close', (event) => {
 ipcMain.on('open-settings', (event) => {
   const parentWindow = BrowserWindow.fromWebContents(event.sender);
   openSettingsWindow(parentWindow);
+});
+
+ipcMain.on('open-embed-devtools', () => {
+  if (mainBrowserView && mainBrowserView.webContents) {
+    mainBrowserView.webContents.toggleDevTools();
+  }
 });
 
 ipcMain.on('theme-color', (event, color) => {

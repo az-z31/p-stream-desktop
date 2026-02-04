@@ -57,6 +57,11 @@ contextBridge.exposeInMainWorld('__PSTREAM_OPEN_SETTINGS__', () => {
   ipcRenderer.send('open-settings');
 });
 
+// Expose function to open DevTools for this (embedded) page
+contextBridge.exposeInMainWorld('__PSTREAM_OPEN_DEVTOOLS__', () => {
+  ipcRenderer.send('open-embed-devtools');
+});
+
 // When the web app requests desktop settings (e.g. menu → Desktop), open the settings panel
 window.addEventListener('pstream-desktop-settings', () => {
   ipcRenderer.send('open-settings');
