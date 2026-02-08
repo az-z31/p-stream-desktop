@@ -182,7 +182,7 @@ async function setActivity(title, mediaMetadata = null) {
     return;
   }
 
-  if (!mediaMetadata || !mediaMetadata.title) {
+  if (!mediaMetadata) {
     setActivityRaw({
       details: 'P-Stream',
       state: 'Browsing',
